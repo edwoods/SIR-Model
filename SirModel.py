@@ -3,6 +3,14 @@ import math
 from enum import IntEnum
 from PyQt5 import QtCore, QtWidgets
 
+
+def GetValue(text):
+    value = float(text)
+    if value.is_integer():
+        value = int(value)
+
+    return value
+
 class Cols(IntEnum):   # cols of the SirModel data array
     group,\
     status,\
@@ -16,17 +24,37 @@ class Cols(IntEnum):   # cols of the SirModel data array
     lastDataCol = range(10)
 
 class Ctrls(IntEnum):
-    nPeeps,\
-    minDaysSick,\
-    pRecover, pDie,\
-    nOwn,\
-    nStrangers, StgrRng, \
-    pServiceGuy, ServNstgrs, ServStrangerRange, \
+    nPeeps, \
+    minDaysSick, \
+    pRecover, pDie, \
     pInfectOwn, pInfectStgr, \
-    pContactTrc, nContTracePerDay, \
-    pObeySIP, \
-    SIPthres, SIPnStgr, SIPstrgrRng, SIPpInfectStgr, SIPpInfectOwn, SIPpObey, SIPduration, \
-    LastCtrl = range(23)
+    nInOwnGrp, \
+    nStrgrsPerDay, StrangeRng, \
+    pServiceGuy, SrvNStgrPerDay, SrvStgrRange, \
+    pContactTrace, nTracePerDay, \
+    LastCtrl = range(15)
+
+    # SIPthres, SIPnStgr, SIPstrgrRng, SIPpInfectOwn, SIPpInfectStgr, SIPpObey, SIPduration, \
+
+    @classmethod
+    def GetDefaults(cls):
+        cs = np.zeros(cls.LastCtrl)
+        cs[cls.nPeeps] = 5000
+        cs[cls.minDaysSick] = 10
+        cs[cls.pRecover] = 0.54
+        cs[cls.pDie] = 0.04
+        cs[cls.pInfectStgr] = 0.05
+        cs[cls.pInfectOwn] = 0.2
+        cs[cls.nInOwnGrp] = 3
+        cs[cls.nStrgrsPerDay] = 5
+        cs[cls.StrangeRng] = 20
+        cs[cls.pServiceGuy] = 0.05
+        cs[cls.SrvNStgrPerDay] = 10
+        cs[cls.SrvStgrRange] = 30
+        cs[cls.pContactTrace] = 0.10
+        cs[cls.nTracePerDay] = 10
+
+        return cs
 
 
 class SirModel:
@@ -45,7 +73,6 @@ class SirModel:
         self.SetCntrls()
         self.newInfected = 0
         self.nRecoveredOrDead = 0
-        r = self.cs[Ctrls.nPeeps]
         c = int(Cols.lastDataCol)
 
         self.data = np.zeros((self.cs[Ctrls.nPeeps], Cols.lastDataCol))
@@ -56,19 +83,12 @@ class SirModel:
         for i, ctrl in enumerate(self.Controls):
             line:QtWidgets.QLineEdit = ctrl
             text = line.text()
-            value = 0
-            try:
-                value = int(text)
-            except:
-                try:
-                    value = float(text)
-                finally:
-                   pass
+            value = GetValue(text)
 
             self.cs.append(value)
 
     def InfectedToRecovered(self, day):
-        infected = np.nonzero(self.data[:,Cols.status] == 11)[0]
+        infected = np.nonzero(self.data[:, Cols.status] == 11)[0]
         longSickGuys = infected[day - self.data[infected, Cols.dayInfec] > self.cs[Ctrls.minDaysSick]]
 
         if longSickGuys.size == 0:
@@ -77,10 +97,10 @@ class SirModel:
         urand = np.random.sample(len(longSickGuys))
         died = longSickGuys[self.cs[Ctrls.pDie] > urand]
         self.data[died, Cols.status] = 99
-        infected = np.nonzero(self.data[:,Cols.status] == 11)
+        infected = np.nonzero(self.data[:, Cols.status] == 11)
 
-        gonners = np.nonzero((day - self.data[infected,Cols.dayInfec]) > 20)[0]
-        self.data[gonners,Cols.status] = 99
+        gonners = np.nonzero((day - self.data[infected, Cols.dayInfec]) > 20)[0]
+        self.data[gonners, Cols.status] = 99
 
         urand2 = np.random.sample(len(longSickGuys))
 
@@ -92,7 +112,7 @@ class SirModel:
         self.nRecoveredOrDead = np.count_nonzero(recovers) + np.count_nonzero(died) + np.count_nonzero(gonners)
 
     def SpreadInfection(self, day):
-        infected = np.nonzero(self.data[:,Cols.status] == 11)
+        infected = np.nonzero(self.data[:, Cols.status] == 11)
         self.newInfected = 0
         if infected[0].size == 0:
             return
@@ -107,17 +127,17 @@ class SirModel:
             self.data[newSickClose, Cols.status] = 11
 
             #  generate and check strangers
-            farthestStranger = self.cs[Ctrls.StgrRng]
-            nstrangers = self.cs[Ctrls.nStrangers]
+            farthestStranger = self.cs[Ctrls.StrangeRng]
+            nstrangers = self.cs[Ctrls.nStrgrsPerDay]
             if self.data[ii, Cols.serviceGuy]:
-                farthestStranger = self.cs[Ctrls.ServStrangerRange]
-                nstrangers = self.cs[Ctrls.ServNstgrs]
+                farthestStranger = self.cs[Ctrls.SrvStgrRange]
+                nstrangers = self.cs[Ctrls.SrvNStgrPerDay]
 
             belowStart = max(0, closeAss[0] - farthestStranger)
             belowEnd = max(0, closeAss[0])
             aboveStart = min(closeAss[-1] + 1, self.cs[Ctrls.nPeeps] - 1)
             aboveEnd = min(closeAss[-1] + 1 + farthestStranger, self.cs[Ctrls.nPeeps] - 1)
-            strangers = np.r_[np.arange(belowStart,belowEnd), np.arange(aboveStart,aboveEnd)]
+            strangers = np.r_[np.arange(belowStart, belowEnd), np.arange(aboveStart, aboveEnd)]
             index = range(len(strangers))
             sgIndex = np.random.permutation(index)
             sgIndex = sgIndex[0:nstrangers]
@@ -136,7 +156,6 @@ class SirModel:
 
     def Reset(self):
         self.SetCntrls()
-        self.day = 0
         self.sipEndDay = 999999
         self.counts = np.zeros((1000, 5))  # 1000 days, 4 type of counts
         self.data = np.zeros((self.cs[Ctrls.nPeeps], Cols.lastDataCol))
@@ -152,16 +171,15 @@ class SirModel:
         self.groups = []
 
         while True:
-            npeep = np.random.poisson(self.cs[Ctrls.nOwn]) + 1
+            npeep = np.random.poisson(self.cs[Ctrls.nInOwnGrp]) + 1
             lastPeep = min(self.cs[Ctrls.nPeeps], nextPeep + npeep)
             peeps = [n for n in range(nextPeep, lastPeep)]
             self.groups.append(peeps)
-            self.data[peeps,Cols.group] = ngrp
+            self.data[peeps, Cols.group] = ngrp
 
             ngrp += 1
             nextPeep += npeep
             if nextPeep > self.cs[Ctrls.nPeeps]:
-                x = 0
                 break
 
         everyone = [n for n in range(self.cs[Ctrls.nPeeps])]
@@ -169,13 +187,13 @@ class SirModel:
         sgIndex = np.random.permutation(everyone)
         self.serviceGuys = sgIndex[0: math.floor(self.cs[Ctrls.nPeeps] * self.cs[Ctrls.pServiceGuy])]
 
-        nStrangers = np.random.poisson(self.cs[Ctrls.nOwn], len(self.serviceGuys)) + 1 # ServNstgrs = avg number of peeps per day
+        nStrangers = np.random.poisson(self.cs[Ctrls.nInOwnGrp], len(self.serviceGuys)) + 1  # ServNstgrs = avg number of peeps per day
         self.data[self.serviceGuys, Cols.nStrgrs] = nStrangers
         self.data[self.serviceGuys, Cols.serviceGuy] = 1
 
          # nonServiceGuys guys, the general public
         self.nonServiceGuys = np.nonzero(self.data[:, Cols.serviceGuy] == 0)
-        nStrangers = np.random.poisson(self.cs[Ctrls.nStrangers], len(self.nonServiceGuys)) + 1 # nStrangers = avg number of peeps per day
+        nStrangers = np.random.poisson(self.cs[Ctrls.nStrgrsPerDay], len(self.nonServiceGuys)) + 1  # nStrangers = avg number of peeps per day
         self.data[self.nonServiceGuys, Cols.nStrgrs] = nStrangers
 
         width = 11

@@ -1,9 +1,9 @@
-import sys
 import matplotlib
 import numpy as np
 from PyQt5.QtWidgets import qApp
+import os, csv
 
-from SirModel import SirModel, Cols
+from SirModel import SirModel, Cols, Ctrls, GetValue
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -46,22 +46,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setTitle("File")
         self.setMenuBar(self.menubar)
-        self.actionOpen = QtWidgets.QAction(self)
-        self.actionOpen.setText("Open")
+
+        self.actionLoadControls = QtWidgets.QAction(self)
+        self.actionLoadControls.setText("Load Controls")
+        self.menuFile.addAction(self.actionLoadControls)
+        self.actionLoadControls.setShortcut('Ctrl+O')
+
         self.actionSave = QtWidgets.QAction(self)
         self.actionSave.setText("Save")
+        self.menuFile.addAction(self.actionSave)
+
+        self.menuFile.addSeparator()
+
         self.actionQuit = QtWidgets.QAction(self)
         self.actionQuit.setText("Quit")
         self.actionQuit.setShortcut('Ctrl+Q')
-
-        self.menuFile.addAction(self.actionOpen)
-        self.menuFile.addAction(self.actionSave)
-        self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionQuit)
+
         self.menubar.addAction(self.menuFile.menuAction())
 
         self.actionSave.triggered.connect(self.SaveFile)
-        self.actionOpen.triggered.connect(self.OpenFile)
+        self.actionLoadControls.triggered.connect(self.LoadControls)
         self.actionQuit.triggered.connect(qApp.quit)
 
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -209,7 +214,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.PvDax.set_title("filler plot")
 
         self.playTimer = QtCore.QTimer()
-        self.playTimer.setInterval(50)
+        self.playTimer.setInterval(10)
         self.playTimer.timeout.connect(self.Run)
 
         self.running = False
@@ -231,8 +236,28 @@ class MainWindow(QtWidgets.QMainWindow):
     def SaveFile(self):
         pass
 
-    def OpenFile(self):
-        pass
+    def LoadControls(self):
+        fileExtension = 'csv'
+        path = os.path.normpath(os.getcwd())
+        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Load Controls " + fileExtension, path,
+                                                            fileExtension.upper() + "(*." + fileExtension + ")")
+        if not fileName:
+            return None
+
+        pathAndName = os.path.split(fileName)
+
+        name = pathAndName[1]
+        filePath = os.path.normpath(pathAndName[0])
+
+        ctrlNames = [str(Ctrls(x)) for x in range(Ctrls.LastCtrl)]
+
+        list1 = []
+        with open(name, "r") as fileInput:
+            for row in csv.reader(fileInput):
+                list1.append(row)
+                var = 'Ctrls.' + row[0]
+                if var in ctrlNames:
+                    i = ctrlNames.index(var)
 
     def ResetClicked(self):
         self.day = 0
@@ -255,35 +280,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self.SirModel.InfectedToRecovered(self.day)
         self.SirModel.SpreadInfection(self.day)
 
+        if self.SirModel.counts[self.day-1,1] == 0:  # the number of infected = 0
+            self.RunClicked()
+
     def DrawStuff(self):
         self.TopPlot()
 
     def AddParameters(self):
-        # param data must be in same order as SirModel.Ctrls
-        paramData = [['nPeeps', 5000, 'number of people in the universe'],
-                  ['min Days Sick', 10, 'days a guy will be sick before he gets better or dies'],
-                  ['pRecover', 0.54, 'Prob that a guys will recover on a given day. Applied after min days sick'],
-                  ['pDie', 0.04,'Prob that a guys will die on a given day. Applied after min days sick'],
-                  ['nOwn Gp', 3, 'Number of guys in your own group you see every day'],
-                  ['nStranger', 5, 'Number of strangers you see each day. Draw from strange universe'],
-                  ['Strgr Univ', 20, 'The universe of guys you could possibly see. Local Univ = [your Id +- strgr univ'],
-                  ['pService Guy', 0.04, 'Prob that any given guy is in a service industry'],
-                  ['Serv nStranger', 10,''],
-                  ['Serv StrgrUniv', 30,''],
-                  ['pInfect own', 0.2,''],
-                  ['pInfect Stgr', 0.05,''],
-                  ['pContTrace', 0.04,''],
-                  ['nContTrace/day', 0.04,''],
-                  ['pObey SIP', 0.9,'']]
 
-        for n, param in enumerate(paramData):
-            pName = param[0]
-            pVal = param[1]
-            toolTip = param[2]
+        ctrlNames = [str(Ctrls(x)) for x in range(Ctrls.LastCtrl)]
+        ctrlVals = Ctrls.GetDefaults()
+
+        for n in range(int(Ctrls.LastCtrl)):
+            pName = ctrlNames[n].split('.')[1]  # e.g. pName = 'Cntrls.nPeeps' just need 'nPeeps'
+            pVal = GetValue(ctrlVals[n])   # pVal of the nth Cntrl
             label = QtWidgets.QLabel(pName, self.SirParamsBox)
             sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
             label.setSizePolicy(sizePolicy)
-            label.setToolTip(toolTip)
 
             label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter)
             self.SPLabelLayout.addWidget(label, 0, QtCore.Qt.AlignRight)
@@ -293,8 +306,19 @@ class MainWindow(QtWidgets.QMainWindow):
             lineEdit.setSizePolicy(sizePolicy)
             lineEdit.setFixedWidth(80)
             lineEdit.setText(str(pVal))
+            lineEdit.editingFinished.connect(lambda x=n: self.ControlChanged(x))
+
             self.cntrls.append(lineEdit)
             self.SPeditsLayout.addWidget(self.cntrls[n])
+
+    def ControlChanged(self, n):
+        x = 0
+        text = self.cntrls[n].text()
+        newValue = GetValue(text)
+        oldValue = self.SirModel.cs[n]
+
+        if newValue != oldValue:
+            self.SirModel.cs[n] = newValue
 
     def TopPlot(self):
         x = self.SirModel.data[:, Cols.xPos]
@@ -318,48 +342,51 @@ class MainWindow(QtWidgets.QMainWindow):
         # dead
         id = self.SirModel.data[:, Cols.status] == 99
 
-        self.tpAx.cla()
-        self.tpAx.scatter(x[nsp], y[nsp], s=1, color='b', marker='.', label='non service non infected')
-        self.tpAx.scatter(x[ssp], y[ssp], color='b', marker='+')
-        self.tpAx.scatter(x[nip], y[nip], s=4, color='r', marker='.')
-        self.tpAx.scatter(x[sip], y[sip], color='r', marker='+')
-        self.tpAx.scatter(x[ir], y[ir], s=4, color='g', marker='.')
-        self.tpAx.scatter(x[id], y[id], color='k', marker='*')
-
         self.SirModel.counts[self.day, 0] = np.count_nonzero(nsp) + np.count_nonzero(ssp)  # suspectable
         self.SirModel.counts[self.day, 1] = np.count_nonzero(nip) + np.count_nonzero(sip)  # infected
         self.SirModel.counts[self.day, 2] = np.count_nonzero(ir)                     # recovered
         self.SirModel.counts[self.day, 3] = np.count_nonzero(id)                     # dead
         self.SirModel.counts[self.day, 4] = self.SirModel.newInfected
 
-        days = np.arange(0, self.day + 1)
-        self.PvDax.set_title("Counts of people vs Day")
-        self.PvDax.set_xlabel('day')
-        self.PvDax.set_ylabel('Count at each status')
+        if self.day % 10 == 0:
+            self.tpAx.cla()
+            self.tpAx.scatter(x[nsp], y[nsp], s=1, color='b', marker='.', label='non service non infected')
+            self.tpAx.scatter(x[ssp], y[ssp], color='b', marker='+')
+            self.tpAx.scatter(x[nip], y[nip], s=4, color='r', marker='.')
+            self.tpAx.scatter(x[sip], y[sip], color='r', marker='+')
+            self.tpAx.scatter(x[ir], y[ir], s=4, color='g', marker='.')
+            self.tpAx.scatter(x[id], y[id], color='k', marker='*')
 
-        colors = ['b','r','g','k']
-        labels = ['non-infected', 'infected', 'recovered','dead']
 
-        if self.newPlot:
-            self.PvDax.cla()
-            self.ax2.cla()
+            days = np.arange(0, self.day + 1)
+            self.PvDax.set_title("Counts of people vs Day")
+            self.PvDax.set_xlabel('day')
+            self.PvDax.set_ylabel('Count at each status')
 
-        self.ax2.plot(days, self.SirModel.counts[days, 4],color='r', marker='.', markersize='4', linewidth='.1')
-        self.ax2.set_ylabel('new infected', color='r')
-        self.ax2.tick_params(axis='y', labelcolor='r')
+            colors = ['b','r','g','k']
+            labels = ['non-infected', 'infected', 'recovered','dead']
 
-        for iplt in range(1,4):
             if self.newPlot:
-                self.PvDax.plot(days, self.SirModel.counts[days, iplt], color=colors[iplt], label=labels[iplt])
-                self.PvDax.legend(loc='best')
-            else:
-                self.PvDax.plot(days, self.SirModel.counts[days, iplt], color=colors[iplt])
+                self.PvDax.cla()
+                self.ax2.cla()
 
-        self.newPlot = False
-        self.PvDax.grid(True)
+            self.ax2.plot(days, self.SirModel.counts[days, 4],color='r', marker='.', markersize='4', linewidth='.1')
+            self.ax2.set_ylabel('new infected', color='r')
+            self.ax2.tick_params(axis='y', labelcolor='r')
 
-        self.Topcanvas.draw()
-        self.PvDcanvas.draw()
+            for iplt in range(1,4):
+                if self.newPlot:
+                    self.PvDax.plot(days, self.SirModel.counts[days, iplt], color=colors[iplt], label=labels[iplt])
+                    self.PvDax.legend(loc='best')
+                else:
+                    self.PvDax.plot(days, self.SirModel.counts[days, iplt], color=colors[iplt])
+
+            self.newPlot = False
+            self.PvDax.grid(True)
+
+            self.Topcanvas.draw()
+            self.PvDcanvas.draw()
+
         cnts = self.SirModel.counts[self.day, :].astype(int)
 
         stats = str(self.day)  \
