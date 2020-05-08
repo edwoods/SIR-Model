@@ -3,10 +3,14 @@ import numpy as np
 from PyQt5.QtWidgets import qApp
 import os, csv
 
-from SirModel import SirModel, Cols, Ctrls, GetValue
+from ControlsWindow import ControlsWindow, SceneStatus
+from SirModel import SirModel, Cols, Ctrls, GetValue, CountType, StatusType
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, \
+    NavigationToolbar2QT as NavigationToolbar
+
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -18,13 +22,14 @@ def make_format(current, other):
     def format_coord(x, y):
         # x, y are data coordinates
         # convert to display coords
-        display_coord = current.transData.transform((x,y))
+        display_coord = current.transData.transform((x, y))
         inv = other.transData.inverted()
         # convert back to data coords with respect to ax
         ax_coord = inv.transform(display_coord)
         coords = [ax_coord, (x, y)]
         return ('Left: {:<40}    Right: {:<}'
-                .format(*['({:.3f}, {:.3f})'.format(x, y) for x,y in coords]))
+                .format(*['({:.3f}, {:.3f})'.format(x, y) for x, y in coords]))
+
     return format_coord
 
 
@@ -41,33 +46,35 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.centralwidget)
         self.setWindowTitle("SIR Model")
 
+        # menus file: open, save, quit   view: controls
         self.menubar = QtWidgets.QMenuBar(self)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
-        self.menuFile = QtWidgets.QMenu(self.menubar)
-        self.menuFile.setTitle("File")
         self.setMenuBar(self.menubar)
 
-        self.actionLoadControls = QtWidgets.QAction(self)
-        self.actionLoadControls.setText("Load Controls")
-        self.menuFile.addAction(self.actionLoadControls)
-        self.actionLoadControls.setShortcut('Ctrl+O')
+        self.menuFile = QtWidgets.QMenu(self.menubar)
+        self.menuFile.setTitle("File")
+        self.menubar.addAction(self.menuFile.menuAction())
 
-        self.actionSave = QtWidgets.QAction(self)
-        self.actionSave.setText("Save")
+        self.actionSave = QtWidgets.QAction(parent=self, text="Save")
         self.menuFile.addAction(self.actionSave)
+        self.actionSave.triggered.connect(self.SaveFile)
 
         self.menuFile.addSeparator()
 
-        self.actionQuit = QtWidgets.QAction(self)
-        self.actionQuit.setText("Quit")
+        self.actionQuit = QtWidgets.QAction(parent=self, text="Quit")
         self.actionQuit.setShortcut('Ctrl+Q')
+        self.actionQuit.triggered.connect(qApp.quit)
         self.menuFile.addAction(self.actionQuit)
 
-        self.menubar.addAction(self.menuFile.menuAction())
+        self.menuView = QtWidgets.QMenu(self.menubar)
+        self.menuView.setTitle("View")
+        self.menubar.addAction(self.menuView.menuAction())
 
-        self.actionSave.triggered.connect(self.SaveFile)
-        self.actionLoadControls.triggered.connect(self.LoadControls)
-        self.actionQuit.triggered.connect(qApp.quit)
+        self.actionControls = QtWidgets.QAction(self)
+        self.actionControls.setText("Controls")
+        self.actionControls.triggered.connect(self.ShowControls)
+        self.actionControls.setShortcut('Alt+C')
+        self.menuView.addAction(self.actionControls)
 
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.centralwidget)
         self.horizontalLayout.setContentsMargins(2, 2, 2, 2)
@@ -93,12 +100,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.CtrlsStatsLayout.addWidget(self.SirParamsBox)
 
         self.SPLabelLayout = QtWidgets.QVBoxLayout()
-        self.SPLabelLayout.setContentsMargins(-1, 5, 2, -1)
-        self.SPLabelLayout.setSpacing(7)
+        self.SPLabelLayout.setContentsMargins(0, 0, 2, 0)
+        self.SPLabelLayout.setSpacing(0)
         self.horizontalLayout_6.addLayout(self.SPLabelLayout)
 
         self.SPeditsLayout = QtWidgets.QVBoxLayout()
-        self.SPeditsLayout.setContentsMargins(-1, -1, 0, -1)
+        self.SPeditsLayout.setContentsMargins(0, 0, 0, 0)
         self.SPeditsLayout.setSpacing(0)
         self.horizontalLayout_6.addLayout(self.SPeditsLayout)
 
@@ -123,6 +130,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.statsNames.setText("Day\n"
                                 "n Susceptable\n"
+                                "Total Infected\n"
                                 "n Infected\n"
                                 "n Recovered\n"
                                 "n Dead\n"
@@ -191,8 +199,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.BottomPlotFrame.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.BottomPlotFrame)
 
-        self.PvDfigure = Figure()  # PvD = PeepsVsDay
-        self.PvDax = self.PvDfigure.add_subplot(111)
+        self.PvDfigure, self.PvDax = plt.subplots(constrained_layout=True)
         self.ax2 = self.PvDax.twinx()
         self.ax2.format_coord = make_format(self.ax2, self.PvDax)
 
@@ -204,14 +211,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.verticalLayout_2.addWidget(toolbar2)
         self.verticalLayout_2.addWidget(self.PvDcanvas)
 
-        x = np.linspace(0, 10)
-        self.PvDax.plot(x, np.sin(x) + x + np.random.randn(50))
-        self.PvDax.plot(x, np.sin(x) + 0.5 * x + np.random.randn(50))
-        self.PvDax.plot(x, np.sin(x) + 2 * x + np.random.randn(50))
-        self.PvDax.plot(x, np.sin(x) - 0.5 * x + np.random.randn(50))
-        self.PvDax.plot(x, np.sin(x) - 2 * x + np.random.randn(50))
-        self.PvDax.plot(x, np.sin(x) + np.random.randn(50))
-        self.PvDax.set_title("filler plot")
+        # x = np.linspace(0, 10)
+        # self.PvDax.plot(x, np.sin(x) + x + np.random.randn(50))
+        # self.PvDax.plot(x, np.sin(x) + 0.5 * x + np.random.randn(50))
+        # self.PvDax.plot(x, np.sin(x) + 2 * x + np.random.randn(50))
+        # self.PvDax.plot(x, np.sin(x) - 0.5 * x + np.random.randn(50))
+        # self.PvDax.plot(x, np.sin(x) - 2 * x + np.random.randn(50))
+        # self.PvDax.plot(x, np.sin(x) + np.random.randn(50))
+        # self.PvDax.set_title("filler plot")
 
         self.playTimer = QtCore.QTimer()
         self.playTimer.setInterval(10)
@@ -220,6 +227,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.running = False
         self.day = 0
         self.SirModel = SirModel(self.cntrls)
+        self.ControlsWindow = ControlsWindow(self.cntrls, self.SirModel)
 
         QtCore.QMetaObject.connectSlotsByName(self)
 
@@ -233,35 +241,20 @@ class MainWindow(QtWidgets.QMainWindow):
             self.playTimer.start()
             self.RunButton.setText('Pause')
 
+    def ShowControls(self):
+        self.ControlsWindow.show()  # Restore from systray
+        self.ControlsWindow.raise_()
+
     def SaveFile(self):
         pass
 
-    def LoadControls(self):
-        fileExtension = 'csv'
-        path = os.path.normpath(os.getcwd())
-        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Load Controls " + fileExtension, path,
-                                                            fileExtension.upper() + "(*." + fileExtension + ")")
-        if not fileName:
-            return None
-
-        pathAndName = os.path.split(fileName)
-
-        name = pathAndName[1]
-        filePath = os.path.normpath(pathAndName[0])
-
-        ctrlNames = [str(Ctrls(x)) for x in range(Ctrls.LastCtrl)]
-
-        list1 = []
-        with open(name, "r") as fileInput:
-            for row in csv.reader(fileInput):
-                list1.append(row)
-                var = 'Ctrls.' + row[0]
-                if var in ctrlNames:
-                    i = ctrlNames.index(var)
-
     def ResetClicked(self):
+        self.ControlsWindow.sceneStatus = SceneStatus.end
         self.day = 0
         self.SirModel.Reset()
+
+        if not self.running:
+            self.RunClicked()
 
     def NewPlotClicked(self):
         self.newPlot = True
@@ -274,17 +267,29 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.running:
             return
 
+        if self.day >= 1000:  # see: SirModel.Reset-- only save data for 1000 days
+            self.RunClicked()
+            return
+
+        # check if there is a Scenario running
+        if self.ControlsWindow.Scenario:
+            if self.ControlsWindow.sceneStatus == SceneStatus.run:
+                self.ControlsWindow.NextDay()
+
+            elif self.ControlsWindow.sceneStatus == SceneStatus.end:
+                self.ResetClicked()
+                self.ControlsWindow.FirstDay()
+
         self.DrawStuff()
 
+        if self.SirModel.counts[self.day, CountType.infected] == 0:  # the number of infected = 0
+            self.ResetClicked()
+            return
+
         self.day += 1
+        self.SirModel.Testing(self.day)
         self.SirModel.InfectedToRecovered(self.day)
         self.SirModel.SpreadInfection(self.day)
-
-        if self.SirModel.counts[self.day-1,1] == 0:  # the number of infected = 0
-            self.RunClicked()
-
-    def DrawStuff(self):
-        self.TopPlot()
 
     def AddParameters(self):
 
@@ -293,16 +298,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for n in range(int(Ctrls.LastCtrl)):
             pName = ctrlNames[n].split('.')[1]  # e.g. pName = 'Cntrls.nPeeps' just need 'nPeeps'
-            pVal = GetValue(ctrlVals[n])   # pVal of the nth Cntrl
+            pVal = GetValue(ctrlVals[n])  # pVal of the nth Cntrl
             label = QtWidgets.QLabel(pName, self.SirParamsBox)
-            sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+            label.setMinimumSize(QtCore.QSize(0, 18))
+            sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
             label.setSizePolicy(sizePolicy)
 
             label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter)
             self.SPLabelLayout.addWidget(label, 0, QtCore.Qt.AlignRight)
 
             lineEdit = QtWidgets.QLineEdit(self.SirParamsBox)
-            sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+            lineEdit.setMinimumSize(QtCore.QSize(0, 18))
+            lineEdit.setMaximumHeight(18)
+            sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
             lineEdit.setSizePolicy(sizePolicy)
             lineEdit.setFixedWidth(80)
             lineEdit.setText(str(pVal))
@@ -312,29 +320,33 @@ class MainWindow(QtWidgets.QMainWindow):
             self.SPeditsLayout.addWidget(self.cntrls[n])
 
     def ControlChanged(self, n):
-        x = 0
+        oldValue = self.SirModel.cs[n]
+
         text = self.cntrls[n].text()
         newValue = GetValue(text)
-        oldValue = self.SirModel.cs[n]
+
+        if newValue is None:
+            self.cntrls[n].setText(str(oldValue))
+            return
 
         if newValue != oldValue:
             self.SirModel.cs[n] = newValue
 
-    def TopPlot(self):
+    def DrawStuff(self):
         x = self.SirModel.data[:, Cols.xPos]
         y = self.SirModel.data[:, Cols.yPos]
 
         # nonservice susceptables
-        nsp = np.logical_and(self.SirModel.data[:, Cols.status] == 0, (self.SirModel.data[:, Cols.serviceGuy] == 0))
+        nsp = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.nonInfected, (self.SirModel.data[:, Cols.serviceGuy] == 0))
 
         # service susceptables
-        ssp = np.logical_and(self.SirModel.data[:, Cols.status] == 0, (self.SirModel.data[:, Cols.serviceGuy] == 1))
+        ssp = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.nonInfected, (self.SirModel.data[:, Cols.serviceGuy] == 1))
 
         # nonservice infected
-        nip = np.logical_and(self.SirModel.data[:, Cols.status] == 11, self.SirModel.data[:, Cols.serviceGuy] == 0)
+        nip = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.infected, self.SirModel.data[:, Cols.serviceGuy] == 0)
 
         # service infected
-        sip = np.logical_and(self.SirModel.data[:, Cols.status] == 11, self.SirModel.data[:, Cols.serviceGuy] == 1)
+        sip = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.infected, self.SirModel.data[:, Cols.serviceGuy] == 1)
 
         # recovered
         ir = self.SirModel.data[:, Cols.status] == 22
@@ -342,44 +354,48 @@ class MainWindow(QtWidgets.QMainWindow):
         # dead
         id = self.SirModel.data[:, Cols.status] == 99
 
-        self.SirModel.counts[self.day, 0] = np.count_nonzero(nsp) + np.count_nonzero(ssp)  # suspectable
-        self.SirModel.counts[self.day, 1] = np.count_nonzero(nip) + np.count_nonzero(sip)  # infected
-        self.SirModel.counts[self.day, 2] = np.count_nonzero(ir)                     # recovered
-        self.SirModel.counts[self.day, 3] = np.count_nonzero(id)                     # dead
-        self.SirModel.counts[self.day, 4] = self.SirModel.newInfected
+        # isolated
+        iso = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.infected, self.SirModel.data[:, Cols.isolated] == 1)
+
+        self.SirModel.counts[self.day, CountType.infected] = np.count_nonzero(nip) + np.count_nonzero(sip)  # infected
+        self.SirModel.counts[self.day, CountType.newInfected] = self.SirModel.newInfected
+        self.SirModel.counts[self.day, CountType.dead] = np.count_nonzero(id)  # dead
+        self.SirModel.counts[self.day, CountType.nonInfected] = np.count_nonzero(nsp) + np.count_nonzero(ssp)  # suspectable
+        self.SirModel.counts[self.day, CountType.recovered] = np.count_nonzero(ir)  # recovered
 
         if self.day % 10 == 0:
             self.tpAx.cla()
-            self.tpAx.scatter(x[nsp], y[nsp], s=1, color='b', marker='.', label='non service non infected')
-            self.tpAx.scatter(x[ssp], y[ssp], color='b', marker='+')
+            self.tpAx.set_title("The entire population")
+            # self.tpAx.scatter(x[nsp], y[nsp], s=12, color='b', marker='.', label='non service non infected')
+            self.tpAx.scatter(x[ssp], y[ssp], s=18, color='b', marker='+')
             self.tpAx.scatter(x[nip], y[nip], s=4, color='r', marker='.')
             self.tpAx.scatter(x[sip], y[sip], color='r', marker='+')
             self.tpAx.scatter(x[ir], y[ir], s=4, color='g', marker='.')
             self.tpAx.scatter(x[id], y[id], color='k', marker='*')
-
-
-            days = np.arange(0, self.day + 1)
-            self.PvDax.set_title("Counts of people vs Day")
-            self.PvDax.set_xlabel('day')
-            self.PvDax.set_ylabel('Count at each status')
-
-            colors = ['b','r','g','k']
-            labels = ['non-infected', 'infected', 'recovered','dead']
+            self.tpAx.scatter(x[iso], y[iso], color='y', marker='o')
 
             if self.newPlot:
                 self.PvDax.cla()
                 self.ax2.cla()
+                self.PvDax.set_title("Counts of people vs Day")
+                self.PvDax.set_xlabel('day')
+                self.PvDax.set_ylabel('Number of Infected')
 
-            self.ax2.plot(days, self.SirModel.counts[days, 4],color='r', marker='.', markersize='4', linewidth='.1')
-            self.ax2.set_ylabel('new infected', color='r')
-            self.ax2.tick_params(axis='y', labelcolor='r')
+            days = np.arange(0, self.day + 1)
 
-            for iplt in range(1,4):
-                if self.newPlot:
-                    self.PvDax.plot(days, self.SirModel.counts[days, iplt], color=colors[iplt], label=labels[iplt])
-                    self.PvDax.legend(loc='best')
-                else:
-                    self.PvDax.plot(days, self.SirModel.counts[days, iplt], color=colors[iplt])
+            colors = ['r', 'r', 'k', 'g', 'b']
+            labels = ['<- infected', '<- new infected', '<- dead', 'recovered ->', 'non-infected']
+            axes = [self.PvDax, self.PvDax, self.PvDax, self.ax2, self.ax2]
+            width = ['1', '.5', '1', '.5', '.5']
+            dash = [False, True, False, True, True]
+
+            plots = [0] * 4
+            for iplt in range(4):  # don't draw the number of non infected
+                plots[iplt], = axes[iplt].plot(days, self.SirModel.counts[days, iplt], color=colors[iplt], linewidth=width[iplt])
+                if dash[iplt]:
+                    plots[iplt].set_dashes([6, 2])
+
+            self.PvDax.legend(plots, labels, loc='best')
 
             self.newPlot = False
             self.PvDax.grid(True)
@@ -389,19 +405,24 @@ class MainWindow(QtWidgets.QMainWindow):
 
         cnts = self.SirModel.counts[self.day, :].astype(int)
 
-        stats = str(self.day)  \
-                + '\n' + str(cnts[0]) \
-                + '\n' + str(cnts[1]) \
-                + '\n' + str(cnts[2]) \
-                + '\n' + str(cnts[3]) \
+        stats = str(self.day) \
+                + '\n' + str(cnts[CountType.nonInfected]) \
+                + '\n' + str(self.SirModel.totalInfected) \
+                + '\n' + str(cnts[CountType.infected]) \
+                + '\n' + str(cnts[CountType.recovered]) \
+                + '\n' + str(cnts[CountType.dead]) \
                 + '\n' + str(self.SirModel.newInfected) \
                 + '\n' + str(self.SirModel.nRecoveredOrDead)
 
         self.StatsData.setText(stats)
 
+
 if __name__ == "__main__":
     import sys
+
     app = QtWidgets.QApplication(sys.argv)
+    app.setStyle('Fusion')
+
     app.setStyleSheet("QToolTip {\
      font-size:10pt;\
      color:white; padding:2px;\
@@ -414,5 +435,5 @@ if __name__ == "__main__":
 
     w = MainWindow()
     w.show()
-    sys.exit(app.exec_())
 
+    sys.exit(app.exec_())

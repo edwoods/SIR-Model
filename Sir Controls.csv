@@ -1,0 +1,21 @@
+Ctrl Name,SIP,Relaxed,No SIP,,,,,,,Scenario,
+nPeeps,2000,2000,2000,,,,,,,No SIP,5
+minDaysSick,10,10,10,,,,,,,SIP,50
+pRecover,0.54,0.54,0.54,,,,,,,Relaxed,50
+pDie,0.04,0.04,0.04,,,,,,,,
+pInfectFamily,0.05,0.05,0.05,,,,,,,,
+pInfectFriend,0.02,0.02,0.02,,,,,,,,
+pInfectStgr,0.01,0.02,0.05,,,,,,,,
+nInFamily,3,3,3,,,,,,,,
+nFriends,10,10,10,,,,,,,,
+FriendsPerDay,1,2,5,,,,,,,,
+FriendRadius,30,30,30,,,,,,,,
+StgrsPerDay,1,2,5,,,,,,,,
+StrangerRadius,50,50,100,,,,,,,,
+pServiceGuy,0.05,0.05,0.05,,,,,,,,
+ServStgrPerDay,10,10,10,,,,,,,,
+ServStgrRadius,30,30,100,,,,,,,,
+DaysTillSymptoms,5,5,5,,,,,,,,
+pShowSymptoms,0.75,0.75,0.75,,,,,,,,
+pTest,0.3,0.3,0.3,,,,,,,,
+nTestsPerDay,20,20,20,,,,,,,,
