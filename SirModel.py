@@ -3,6 +3,12 @@ import math
 from enum import IntEnum
 from PyQt5 import QtWidgets
 
+# Python program to illustrate union
+# Without repetition
+def Union(lst1, lst2):
+    final_list = list(set(lst1) | set(lst2))
+    return final_list
+
 
 def GetValue(text):
     try:
@@ -16,43 +22,49 @@ def GetValue(text):
 
 
 class CountType(IntEnum):  # cols of the SirModel data array
-    infected, \
-    newInfected, \
-    dead, \
-    recovered, \
-    nonInfected, \
-    lastCountType = range(6)
+    [infected,
+     newInfected,
+     dead,
+     recovered,
+     nonInfected,
+     lastCountType] = range(6)
+
 
 class StatusType(IntEnum):
     nonInfected = 0
     infected = 11
     recovered = 22
     dead = 99
+    byWatch = 30
+    bySymptom = 31
 
 
 class Cols(IntEnum):  # cols of the SirModel data array
-    family, \
-    status, \
-    dayInfec, \
-    serviceGuy, \
-    xPos, \
-    yPos, \
-    symptomatic, \
-    isolated, \
-    nInfected, \
-    lastDataCol = range(10)
+    [family,
+     status,
+     dayInfec,
+     serviceGuy,
+     hasWatch,
+     needTest,
+     xPos,
+     yPos,
+     symptomatic,
+     isolatedOn,
+     isolatedBy,   # 31 = symptoms -> test;  30 = by watch
+     lastDataCol] = range(12)
 
 
 class Ctrls(IntEnum):
-    nPeeps, \
-    minDaysSick, \
-    pRecover, pDie, \
-    pInfectFamily, pInfectFriend, pInfectStgr, \
-    nInFamily, nFriends, FriendsPerDay, FriendRadius, \
-    StgrsPerDay, StrangerRadius, \
-    pServiceGuy, ServStgrPerDay, ServStgrRadius, \
-    DaysTillSymptoms, pShowSymptoms, pTest, nTestsPerDay,\
-    LastCtrl = range(21)
+    [nPeeps,
+     minDaysSick,
+     pRecover, pDie,
+     pInfectFamily, pInfectFriend, pInfectStgr,
+     nInFamily, nFriends, FriendsPerDay, FriendRadius,
+     StgrsPerDay, StrangerRadius,
+     pServiceGuy, ServStgrPerDay, ServStgrRadius,
+     DaysTillSymptoms, pShowSymptoms, pTest, nTestsPerDay,
+     pHaveWatch, Test2Isolate,
+     LastCtrl] = range(23)
 
     # SIPthres, SIPnStgr, SIPstrgrRng, SIPpInfectOwn, SIPpInfectStgr, SIPpObey, SIPduration, \
 
@@ -66,16 +78,16 @@ class Ctrls(IntEnum):
         cs[cls.pDie] = 0.04
 
         cs[cls.pInfectFamily] = 0.05
-        cs[cls.pInfectFriend] = 0.02
-        cs[cls.pInfectStgr] = 0.01
+        cs[cls.pInfectFriend] = 0.05
+        cs[cls.pInfectStgr] = 0.05
 
         cs[cls.nInFamily] = 3
 
         cs[cls.nFriends] = 10
-        cs[cls.FriendsPerDay] = 1
+        cs[cls.FriendsPerDay] = 2
         cs[cls.FriendRadius] = 30
 
-        cs[cls.StgrsPerDay] = 1
+        cs[cls.StgrsPerDay] = 3
         cs[cls.StrangerRadius] = 50
 
         cs[cls.pServiceGuy] = 0.05
@@ -84,19 +96,33 @@ class Ctrls(IntEnum):
 
         cs[cls.DaysTillSymptoms] = 5
         cs[cls.pShowSymptoms] = 0.75  # https://www.nbcnews.com/
-        cs[cls.pTest] = 0.30
-        cs[cls.nTestsPerDay] = 20
+        cs[cls.pTest] = 0.50
+        cs[cls.nTestsPerDay] = 200
+        cs[cls.pHaveWatch] = 0.8
+        cs[cls.Test2Isolate] = 2
 
         return cs
 
 
 class SirModel:
+    EndOfTime = 999999
+
+    # index into RunStats
+    [infectedRS,
+     unawareInfectedRS,
+     isoBySymptom,
+     isoByWatch,
+     lastRunStat] = range(5)
+
+    maxSamples = 20
+    maxSampleDay = 500
+
     def __init__(self, cntrlsIn):
         self.cs = []
         self.sipEndDay = 0
         self.SipStartDays = 0
         self.SipEndDays = 0
-        self.infected = 0
+        self.TotalInfected = 0
         self.family = 0
         self.friends = 0
         self.serviceGuys = 0
@@ -106,9 +132,14 @@ class SirModel:
         self.Controls = cntrlsIn
         self.SetCntrls()
         self.newInfected = 0
+        self.savedByHMD = 0
         self.nRecoveredOrDead = 0
         self.contacts = []
         self.everyone = []
+
+        self.ctrlsChanged = False
+        self.Sample = -1
+        self.RunStats = np.zeros([self.lastRunStat, self.maxSamples, self.maxSampleDay])  # 3 types of stats, 20 samples, 150 days
 
         self.data = np.zeros((self.cs[Ctrls.nPeeps], Cols.lastDataCol))
         self.Reset()
@@ -146,46 +177,120 @@ class SirModel:
 
         self.nRecoveredOrDead = np.count_nonzero(recovers) + np.count_nonzero(died) + np.count_nonzero(gonners)
 
+    def CheckWatch(self, day):
+        # find newly infected guys with a watch
+        watchGuys = self.everyone[self.cs[:,Cols.hasWatch] == 1]
+
+        pass
+
+    def DailySummary(self, day):
+        infected = self.everyone[self.data[:, Cols.status] == StatusType.infected]
+        isolated = infected[self.data[infected, Cols.isolatedOn] < day]
+
+        nIsoBySymp = isolated[self.data[isolated, Cols.isolatedBy] == StatusType.bySymptom]
+        nIsoByWatch = isolated[self.data[isolated, Cols.isolatedBy] == StatusType.byWatch]
+
+        nInfected = len(infected)
+        nIsoBySymp = len(nIsoBySymp)
+        nIsoByWatch = len(nIsoByWatch)
+
+        nUnawareInfected = nInfected - nIsoBySymp - nIsoByWatch
+
+        self.RunStats[self.infectedRS,
+                      self.Sample,
+                      day] = nInfected
+
+        self.RunStats[self.unawareInfectedRS,
+                      self.Sample,
+                      day] = nUnawareInfected
+
+        self.RunStats[self.isoBySymptom,
+                      self.Sample,
+                      day] = nIsoBySymp
+
+        self.RunStats[self.isoByWatch,
+                      self.Sample,
+                      day] = nIsoByWatch
+        pass
+
     def Testing(self, day):
         # you get a test if
+        #   - your watch says you need a test
         #   - you are infected
         #   - for at least DaysTillSymptoms show
         #   - you show symptoms
         #   - you are are not isolated
 
-        # find guys that have been infected a while
-        symptomatic = np.logical_and(
-            self.data[:, Cols.status] == StatusType.infected,
-            (day - self.data[:, Cols.dayInfec]) > self.cs[Ctrls.DaysTillSymptoms])
+        # find guys that have been infected
+        symptomatic = self.everyone[self.data[:, Cols.status] == StatusType.infected]
+
+        # print('day ', day, ' infected: ', symptomatic, 'hasW', self.data[symptomatic, Cols.hasWatch])
+
+        #  for at least DaysTillSymptoms
+        symptomatic = symptomatic[(day - self.data[symptomatic, Cols.dayInfec]) > self.cs[Ctrls.DaysTillSymptoms]]
 
         # limit to the guys that will show symptoms
-        symptomatic = np.logical_and(
-            symptomatic, self.data[:, Cols.symptomatic] == 1)
+        symptomatic = symptomatic[self.data[symptomatic, Cols.symptomatic] == 1]
 
-        # limit to guys who are not isolated
-        symptomatic = np.logical_and(
-            symptomatic, self.data[:, Cols.isolated] == 0)
+        # limit the guys that have NOT been tested recently
+        symptomatic = symptomatic[self.data[symptomatic, Cols.isolatedOn] == self.EndOfTime]
 
-        symptomatic = self.everyone[symptomatic]  # get the guys
+        #  combine the 2 list of guys to be tested
+        # needTest = np.union1d(needTest, symptomatic)
+        needTest = symptomatic
 
-        if len(symptomatic) == 0:
-            return
+        if len(needTest) != 0:
+            #  only get to test a certain % a day
+            nTests = min(self.cs[Ctrls.nTestsPerDay], math.ceil(self.cs[Ctrls.pTest] * len(needTest)))
 
-        symptomatic = np.random.permutation(symptomatic)
+            needTest = np.random.permutation(needTest)
+            needTest = needTest[:int(nTests)]
 
-        nTests = min(self.cs[Ctrls.nTestsPerDay], math.ceil(self.cs[Ctrls.pTest] * len(symptomatic)))
-        testies = symptomatic[:int(nTests)]
+            # some tested people may not be sick: these will test negative. Isolate only the infected
+            isolated = needTest[self.data[needTest, Cols.status] == StatusType.infected]
 
-        self.data[testies, Cols.isolated] = 1
-        pass
+            # mark the guys that get tested to be isolated later: in Test2Isolate days
+            self.data[isolated, Cols.isolatedBy] = StatusType.bySymptom
+            self.data[isolated, Cols.isolatedOn] = day + self.cs[Ctrls.Test2Isolate]
+
+            # print('day ', day, ' isolated by sym: ', isolated, ' on ', self.data[isolated, Cols.isolatedOn])
+
+        # get the guys that the watch alerted to get tested
+        alertedByWatch = self.everyone[self.data[:, Cols.needTest] != 0]
+        self.data[alertedByWatch, Cols.isolatedBy] = StatusType.byWatch
+        self.data[alertedByWatch, Cols.isolatedOn] = day  # isolate the day after you are infected
+
+        # print('day ', day, ' alertedByWatch: ', alertedByWatch)
+
+        #  combine the 2 list of guys to be tested
+        needTest = np.union1d(alertedByWatch, needTest)
+
+        if len(needTest) > 0:
+            # print('top ', needTest)
+
+            for ii in needTest:
+                # contacts of this guy
+                contacts = self.contacts[ii]
+                self.data[contacts, Cols.needTest] += 1
+                # print('day ', day, ' contacts: ', ii, contacts)
+
+                self.contacts[ii] = []
+
+            # reset the needTest flag
+            self.data[needTest, Cols.needTest] = 0
+
+        isolated = self.everyone[self.data[:, Cols.status] == StatusType.infected]
+        # print('day ', day, ' total isolated: ', isolated, ' on ', self.data[isolated, Cols.isolatedOn])
+        x = 0
 
     def SpreadInfection(self, day):
         self.newInfected = 0
-        infected = np.logical_and(
-            self.data[:, Cols.status] == StatusType.infected,
-            self.data[:, Cols.isolated] == 0)
 
-        infected = self.everyone[infected]
+        infected = self.everyone[self.data[:, Cols.status] == StatusType.infected]
+        infected = infected[self.data[infected, Cols.isolatedOn] > day]  # and not isolated
+
+        # print('day ', day, ' inf ! iso: ', infected, ' on ', self.data[infected, Cols.isolatedOn])
+
         if len(infected) == 0:
             return
 
@@ -198,7 +303,10 @@ class SirModel:
 
             self.data[newSickFamily, Cols.dayInfec] = day
             self.data[newSickFamily, Cols.status] = StatusType.infected
-            self.contacts[ii].extend(newSickFamily.tolist())
+
+            if self.data[ii, Cols.hasWatch]:
+                self.contacts[ii] = Union(self.contacts[ii], newSickFamily)
+
             # for n in newSickFamily:
             #    self.contacts[n].append(ii)
 
@@ -215,7 +323,10 @@ class SirModel:
 
             self.data[newSickFriends, Cols.dayInfec] = day
             self.data[newSickFriends, Cols.status] = StatusType.infected
-            self.contacts[ii].extend(newSickFriends.tolist())
+
+            if self.data[ii, Cols.hasWatch]:
+                self.contacts[ii] = Union(self.contacts[ii], newSickFriends)
+
             # for n in newSickFriends:
             #     self.contacts[n].append(ii)
 
@@ -226,7 +337,6 @@ class SirModel:
                 farthestStranger = self.cs[Ctrls.ServStgrRadius]
                 nstrangers = self.cs[Ctrls.ServStgrPerDay]
 
-            nstrangersP = nstrangers
             belowStart = max(0, ii - farthestStranger)
             aboveEnd = min(ii + farthestStranger, self.cs[Ctrls.nPeeps] - 1)
             strangers = np.arange(belowStart, aboveEnd)    # everyone inside StrangerRadius
@@ -238,35 +348,49 @@ class SirModel:
             suscepts2 = strangers[self.data[strangers, Cols.status] == 0]
             urand2 = np.random.sample(len(suscepts2))
             newSickStgr = suscepts2[urand2 < self.cs[Ctrls.pInfectStgr]]
-            self.contacts[ii].extend(newSickStgr.tolist())
-            # for n in newSickStgr:
-            #     self.contacts[n].append(ii)
+
+            if self.data[ii, Cols.hasWatch]:
+                self.contacts[ii] = Union(self.contacts[ii], newSickStgr)
+
+            if any(self.contacts[ii]):
+                # print('contact for ', ii, self.contacts[ii])
+                x = 0
 
             newII = len(newSickFamily) + len(newSickFriends) + len(newSickStgr)
             self.newInfected = self.newInfected + newII
 
-            self.data[ii, Cols.nInfected] = self.data[ii, Cols.nInfected] + newII
             self.data[newSickStgr, Cols.dayInfec] = day
             self.data[newSickStgr, Cols.status] = StatusType.infected
 
-        self.totalInfected += self.newInfected
+        self.TotalInfected += self.newInfected
 
     def Reset(self):
+        if self.ctrlsChanged:
+            self.ctrlsChanged = False
+            self.Sample = -1
+            #  save the stats
+            np.savetxt("RunStats.csv", self.RunStats, delimiter=",")
+            self.RunStats.fill(0)
+
+        self.Sample += 1
+
         self.SetCntrls()
 
         self.everyone = np.arange(self.cs[Ctrls.nPeeps])
 
         self.contacts = [[] for i in range(self.cs[Ctrls.nPeeps])]
-        self.sipEndDay = 999999
+        # self.contacts = [np.array([]) for i in range(self.cs[Ctrls.nPeeps])]
+        self.sipEndDay = self.EndOfTime
         self.counts = np.zeros((1000, CountType.lastCountType))  # 1000 days, 5 type of counts
         self.data = np.zeros((self.cs[Ctrls.nPeeps], Cols.lastDataCol))
 
-        # self.infected = [nPeeps2, nPeeps2 + 10]
         #  INITIAL infected guys
         infected = list(range(1000, self.cs[Ctrls.nPeeps], 1000))
 
+        self.TotalInfected = len(infected)
+
         self.newInfected = 0
-        self.totalInfected = len(infected)
+        self.savedByHMD = 0
 
         self.data[infected, Cols.status] = StatusType.infected
         self.data[infected, Cols.dayInfec] = 0
@@ -314,6 +438,15 @@ class SirModel:
 
         # nonServiceGuys guys, the general public
         self.nonServiceGuys = np.nonzero(self.data[:, Cols.serviceGuy] == 0)
+
+        # set the isolate day to a big number
+        self.data[:, Cols.isolatedOn] = self.EndOfTime
+
+        # guys with a watch
+        watchers = np.random.permutation(self.everyone)
+        nWatches = math.floor(self.cs[Ctrls.pHaveWatch] * self.cs[Ctrls.nPeeps])
+        watchers = watchers[: nWatches]
+        self.data[watchers, Cols.hasWatch] = 1
 
         width = 11
         hgt = 3
