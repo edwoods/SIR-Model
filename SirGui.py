@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+from StatsPlot import StatsPlot
+
 matplotlib.use('Qt5Agg')
 
 
@@ -76,6 +78,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionControls.setShortcut('Alt+C')
         self.menuView.addAction(self.actionControls)
 
+        self.actionStats1 = QtWidgets.QAction(self)
+        self.actionStats1.setText("Stats 1")
+        self.actionStats1.triggered.connect(self.ShowStats1)
+        self.actionStats1.setShortcut('Alt+1')
+        self.menuView.addAction(self.actionStats1)
+
+        self.actionStats2 = QtWidgets.QAction(self)
+        self.actionStats2.setText("Stats 2")
+        self.actionStats2.triggered.connect(self.ShowStats2)
+        self.actionStats2.setShortcut('Alt+2')
+        self.menuView.addAction(self.actionStats2)
+
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.centralwidget)
         self.horizontalLayout.setContentsMargins(2, 2, 2, 2)
         self.horizontalLayout.setSpacing(3)
@@ -129,6 +143,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statsNames.setFont(font)
 
         self.statsNames.setText("Day\n"
+                                "Sample\n"
                                 "n Susceptable\n"
                                 "Total Infected\n"
                                 "n Infected\n"
@@ -149,28 +164,58 @@ class MainWindow(QtWidgets.QMainWindow):
         self.StatsData.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self.horizontalLayout_5.addWidget(self.StatsData)
 
-        self.ButtonLayout = QtWidgets.QHBoxLayout()
-        self.ButtonLayout.setContentsMargins(-1, 0, -1, -1)
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldsStayAtSizeHint)
 
-        self.ResetButton = QtWidgets.QPushButton(self.centralwidget)
-        self.ResetButton.setMaximumSize(QtCore.QSize(50, 16777215))
-        self.ResetButton.setText("Reset")
-        self.ResetButton.clicked.connect(self.ResetClicked)
-        self.ButtonLayout.addWidget(self.ResetButton)
+        self.ResetStats = QtWidgets.QPushButton(self.centralwidget)
+        self.ResetStats.setText("Stats -> 0")
+        self.ResetStats.clicked.connect(self.ResetStatsClicked)
 
-        self.NewPlot = QtWidgets.QPushButton(self.centralwidget)
-        self.NewPlot.setMaximumSize(QtCore.QSize(50, 16777215))
-        self.NewPlot.setText("NewPlot")
-        self.NewPlot.clicked.connect(self.NewPlotClicked)
-        self.ButtonLayout.addWidget(self.NewPlot)
+        self.SaveCumPlot = QtWidgets.QPushButton(self.centralwidget)
+        self.SaveCumPlot.setText("Save Plot")
+        self.SaveCumPlot.clicked.connect(self.SaveStatsPlot)
+
+        self.ClearPlot = QtWidgets.QPushButton(self.centralwidget)
+        self.ClearPlot.setText("Clear Plot")
+        self.ClearPlot.clicked.connect(self.NewPlotClicked)
+
+        self.Day0 = QtWidgets.QPushButton(self.centralwidget)
+        self.Day0.setText("Day -> 0")
+        self.Day0.clicked.connect(self.DayToZero)
 
         self.RunButton = QtWidgets.QPushButton(self.centralwidget)
-        self.RunButton.setMaximumSize(QtCore.QSize(50, 16777215))
         self.RunButton.setText("Run")
         self.RunButton.clicked.connect(self.RunClicked)
-        self.ButtonLayout.addWidget(self.RunButton)
 
-        self.CtrlsStatsLayout.addLayout(self.ButtonLayout)
+        self.formLayout.addRow(self.SaveCumPlot, self.ResetStats)
+        self.formLayout.addRow(self.ClearPlot, self.Day0)
+        self.formLayout.addRow(None, self.RunButton)
+
+        self.CtrlsStatsLayout.addLayout(self.formLayout)
+
+        # self.ButtonLayout = QtWidgets.QHBoxLayout()
+        # self.ButtonLayout.setContentsMargins(-1, 0, -1, -1)
+        #
+        # self.ResetButton = QtWidgets.QPushButton(self.centralwidget)
+        # self.ResetButton.setMaximumSize(QtCore.QSize(50, 16777215))
+        # self.ResetButton.setText("Reset")
+        # self.ResetButton.clicked.connect(self.ResetClicked)
+        # self.ButtonLayout.addWidget(self.ResetButton)
+        #
+        # self.NewPlot = QtWidgets.QPushButton(self.centralwidget)
+        # self.NewPlot.setMaximumSize(QtCore.QSize(50, 16777215))
+        # self.NewPlot.setText("NewPlot")
+        # self.NewPlot.clicked.connect(self.NewPlotClicked)
+        # self.ButtonLayout.addWidget(self.NewPlot)
+        #
+        # self.RunButton = QtWidgets.QPushButton(self.centralwidget)
+        # self.RunButton.setMaximumSize(QtCore.QSize(50, 16777215))
+        # self.RunButton.setText("Run")
+        # self.RunButton.clicked.connect(self.RunClicked)
+        # self.ButtonLayout.addWidget(self.RunButton)
+        #
+        # self.CtrlsStatsLayout.addLayout(self.ButtonLayout)
+
         self.horizontalLayout.addLayout(self.CtrlsStatsLayout)
 
         # add the plots
@@ -211,15 +256,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.verticalLayout_2.addWidget(toolbar2)
         self.verticalLayout_2.addWidget(self.PvDcanvas)
 
-        # x = np.linspace(0, 10)
-        # self.PvDax.plot(x, np.sin(x) + x + np.random.randn(50))
-        # self.PvDax.plot(x, np.sin(x) + 0.5 * x + np.random.randn(50))
-        # self.PvDax.plot(x, np.sin(x) + 2 * x + np.random.randn(50))
-        # self.PvDax.plot(x, np.sin(x) - 0.5 * x + np.random.randn(50))
-        # self.PvDax.plot(x, np.sin(x) - 2 * x + np.random.randn(50))
-        # self.PvDax.plot(x, np.sin(x) + np.random.randn(50))
-        # self.PvDax.set_title("filler plot")
-
         self.playTimer = QtCore.QTimer()
         self.playTimer.setInterval(10)
         self.playTimer.timeout.connect(self.Run)
@@ -229,7 +265,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.SirModel = SirModel(self.cntrls)
         self.ControlsWindow = ControlsWindow(self.cntrls, self.SirModel)
 
+        self.statsPlot = StatsPlot(self.cntrls, self.SirModel)
+        self.statsPlot.show()
+        self.counts = np.arange(1000 * CountType.lastCountType).reshape(1000, CountType.lastCountType)
+        self.counts.fill(0)
+
+        # self.SP2 = StatsPlot(self.cntrls, self.SirModel)
+        # self.SP2.setWindowTitle("Last Stats")
+        # self.SP2.hide()
+
         QtCore.QMetaObject.connectSlotsByName(self)
+
+    def ShowStats1(self):
+        self.statsPlot.show()
+
+    def ShowStats2(self):
+        self.SP2.show()
 
     def RunClicked(self):
         if self.running:
@@ -248,26 +299,37 @@ class MainWindow(QtWidgets.QMainWindow):
     def SaveFile(self):
         pass
 
-    def ResetClicked(self):
+    def DayToZero(self):
+        self.statsPlot.Update(200)
         self.ControlsWindow.sceneStatus = SceneStatus.end
         self.day = 0
+        self.counts.fill(0)
+
+        # if self.SirModel.ctrlsChanged:  # at least one controls has changed
+        #     self.ResetStatsClicked()
+
         self.SirModel.Reset()
 
         if not self.running:
             self.RunClicked()
 
+    def ResetStatsClicked(self):
+        self.statsPlot.Update(200)
+        self.statsPlot.SaveWindow()
+        self.SirModel.ResetStats = True
+
+    def SaveStatsPlot(self):
+        self.statsPlot.SaveWindow()
+
     def NewPlotClicked(self):
         self.newPlot = True
         self.PvDax.cla()
-
-        # self.running = False
-        # self.playTimer.stop()
 
     def Run(self):
         if not self.running:
             return
 
-        if self.day >= 1000:  # see: SirModel.Reset-- only save data for 1000 days
+        if self.day >= 200:  # see: SirModel.Reset-- only save data for 1000 days
             self.RunClicked()
             return
 
@@ -277,13 +339,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.ControlsWindow.NextDay()
 
             elif self.ControlsWindow.sceneStatus == SceneStatus.end:
-                self.ResetClicked()
+                self.DayToZero()
                 self.ControlsWindow.FirstDay()
+
+        self.SirModel.DailySummary(self.day)
+        self.statsPlot.Update(self.day)
 
         self.DrawStuff()
 
-        if self.SirModel.counts[self.day, CountType.infected] == 0:  # the number of infected = 0
-            self.ResetClicked()
+        if self.counts[self.day, CountType.infected] == 0:  # the number of infected = 0
+            self.DayToZero()
             return
 
         self.day += 1
@@ -331,39 +396,56 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if newValue != oldValue:
             self.SirModel.cs[n] = newValue
+            SirModel.ctrlsChanged = True
 
     def DrawStuff(self):
-        x = self.SirModel.data[:, Cols.xPos]
-        y = self.SirModel.data[:, Cols.yPos]
 
-        # nonservice susceptables
+        # non-service susceptables
         nsp = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.nonInfected, (self.SirModel.data[:, Cols.serviceGuy] == 0))
 
         # service susceptables
         ssp = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.nonInfected, (self.SirModel.data[:, Cols.serviceGuy] == 1))
 
-        # nonservice infected
-        nip = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.infected, self.SirModel.data[:, Cols.serviceGuy] == 0)
+        # infected
+        infected = self.SirModel.everyone[self.SirModel.data[:,Cols.status] == StatusType.infected]
+
+        # non-service infected
+        nip = infected[self.SirModel.data[infected, Cols.serviceGuy] == 0]
 
         # service infected
-        sip = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.infected, self.SirModel.data[:, Cols.serviceGuy] == 1)
+        sip = infected[self.SirModel.data[infected, Cols.serviceGuy] == 1]
 
         # recovered
         ir = self.SirModel.data[:, Cols.status] == 22
 
         # dead
-        id = self.SirModel.data[:, Cols.status] == 99
+        id = self.SirModel.everyone[self.SirModel.data[:, Cols.status] == 99]
 
         # isolated
-        iso = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.infected, self.SirModel.data[:, Cols.isolated] == 1)
+        iso = infected[self.SirModel.data[infected, Cols.isolatedOn] <= self.day]
 
-        self.SirModel.counts[self.day, CountType.infected] = np.count_nonzero(nip) + np.count_nonzero(sip)  # infected
-        self.SirModel.counts[self.day, CountType.newInfected] = self.SirModel.newInfected
-        self.SirModel.counts[self.day, CountType.dead] = np.count_nonzero(id)  # dead
-        self.SirModel.counts[self.day, CountType.nonInfected] = np.count_nonzero(nsp) + np.count_nonzero(ssp)  # suspectable
-        self.SirModel.counts[self.day, CountType.recovered] = np.count_nonzero(ir)  # recovered
+        # iso by watch
+        isoByWatch = iso[self.SirModel.data[iso, Cols.isolatedBy] == StatusType.byWatch]
+
+        # iso by symptom
+        isoBySymptom = iso[self.SirModel.data[iso, Cols.isolatedBy] == StatusType.bySymptom]
+
+        # with watch
+        hasWatch = self.SirModel.everyone[self.SirModel.data[:, Cols.hasWatch] == 1]
+
+        # infected and not isolated
+        notIso = len(infected) - len(isoBySymptom) - len(isoByWatch) + 0.01
+
+        self.counts[self.day, CountType.infected] = len(infected)
+        self.counts[self.day, CountType.isoBySymptom] = len(isoBySymptom)
+        self.counts[self.day, CountType.isoByWatch] = len(isoByWatch)
+        self.counts[self.day, CountType.dead] = len(id)
+        self.counts[self.day, CountType.infectRatio] = 100*(self.SirModel.newInfected / notIso)
 
         if self.day % 10 == 0:
+            x = self.SirModel.data[:, Cols.xPos]
+            y = self.SirModel.data[:, Cols.yPos]
+
             self.tpAx.cla()
             self.tpAx.set_title("The entire population")
             # self.tpAx.scatter(x[nsp], y[nsp], s=12, color='b', marker='.', label='non service non infected')
@@ -373,6 +455,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tpAx.scatter(x[ir], y[ir], s=4, color='g', marker='.')
             self.tpAx.scatter(x[id], y[id], color='k', marker='*')
             self.tpAx.scatter(x[iso], y[iso], color='y', marker='o')
+            self.tpAx.scatter(x[hasWatch], y[hasWatch], s=12, facecolors='none', edgecolors='m')
 
             if self.newPlot:
                 self.PvDax.cla()
@@ -383,15 +466,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
             days = np.arange(0, self.day + 1)
 
-            colors = ['r', 'r', 'k', 'g', 'b']
-            labels = ['<- infected', '<- new infected', '<- dead', 'recovered ->', 'non-infected']
-            axes = [self.PvDax, self.PvDax, self.PvDax, self.ax2, self.ax2]
-            width = ['1', '.5', '1', '.5', '.5']
-            dash = [False, True, False, True, True]
+            colors = ['r', 'y', 'm', 'k', 'silver']
+            labels = ['<- infected', '<- isoBySymptom', '<- isoByWatch', '<- dead', 'infectRatio ->']
+            axes = [self.PvDax, self.PvDax, self.PvDax, self.PvDax, self.ax2]
+            width = ['1', '.5', '.5', '.5', '.5']
+            dash = [False, True, False, False, True]
 
-            plots = [0] * 4
-            for iplt in range(4):  # don't draw the number of non infected
-                plots[iplt], = axes[iplt].plot(days, self.SirModel.counts[days, iplt], color=colors[iplt], linewidth=width[iplt])
+            plots = [0] * 5
+            for iplt in range(5):
+                plots[iplt], = axes[iplt].plot(days, self.counts[days, iplt], color=colors[iplt], linewidth=width[iplt])
                 if dash[iplt]:
                     plots[iplt].set_dashes([6, 2])
 
@@ -403,18 +486,28 @@ class MainWindow(QtWidgets.QMainWindow):
             self.Topcanvas.draw()
             self.PvDcanvas.draw()
 
-        cnts = self.SirModel.counts[self.day, :].astype(int)
-
+        nonInfected = np.count_nonzero(self.SirModel.data[:,Cols.status] == StatusType.nonInfected)
+        recovered = np.count_nonzero(self.SirModel.data[:,Cols.status] == StatusType.recovered)
         stats = str(self.day) \
-                + '\n' + str(cnts[CountType.nonInfected]) \
-                + '\n' + str(self.SirModel.totalInfected) \
-                + '\n' + str(cnts[CountType.infected]) \
-                + '\n' + str(cnts[CountType.recovered]) \
-                + '\n' + str(cnts[CountType.dead]) \
+                + '\n' + str(self.SirModel.Sample)  \
+                + '\n' + str(nonInfected) \
+                + '\n' + str(self.SirModel.TotalInfected) \
+                + '\n' + str(len(infected)) \
+                + '\n' + str(recovered) \
+                + '\n' + str(len(id)) \
                 + '\n' + str(self.SirModel.newInfected) \
                 + '\n' + str(self.SirModel.nRecoveredOrDead)
-
         self.StatsData.setText(stats)
+
+            # Day\n
+        # "n Susceptable\n"
+        # "Total Infected\n"
+        # "n Infected\n"
+        # "n Recovered\n"
+        # "n Dead\n"
+        # "New Infected\n"
+        # "New Recover/Died\n"
+        # "Infection Rate")
 
 
 if __name__ == "__main__":

@@ -42,8 +42,8 @@ class ControlsWindow(QtWidgets.QMainWindow):
         self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.tabWidget.setSizePolicy(sizePolicy)
-        self.tabWidget.setTabsClosable(True)
-        self.tabWidget.setMovable(True)
+        self.tabWidget.setTabsClosable(False)
+        self.tabWidget.setMovable(False)
         self.verticalLayout.addWidget(self.tabWidget)
         self.tabWidget.tabCloseRequested.connect(self.CloseTab)
 
@@ -189,7 +189,9 @@ class ControlsWindow(QtWidgets.QMainWindow):
                 continue
             self.controls[row - 1].setText(item.text())
 
+        self.SirModel.ResetStats = True
         self.SirModel.SetCntrls()
+        # self.SirModel.ctrlsChanged = True
 
     def SaveControls(self):
         SaveAsCsv('Sir Controls.csv', self.DefaultTable)
