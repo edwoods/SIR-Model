@@ -23,7 +23,9 @@ class StatsPlot(QtWidgets.QWidget):
         self.controls = controls  # type: list[QtWidgets.QLineEdit]
         self.SirModel = SirModel
 
-        self.resize(660, 451)
+        self.NewWindow = False
+
+        self.resize(860, 451)
         self.setWindowTitle("Multi-run stats")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self)
         self.horizontalLayout_2.setContentsMargins(1, 2, 1, 1)
@@ -61,12 +63,9 @@ class StatsPlot(QtWidgets.QWidget):
 
         self.SaveButton = QtWidgets.QPushButton(self)
         self.SaveButton.setText("Save")
+        self.SaveButton.clicked.connect(self.SaveWindow)
         self.verticalLayout.addWidget(self.SaveButton)
         self.horizontalLayout_2.addLayout(self.verticalLayout)
-
-        # self.graphicsView = QtWidgets.QGraphicsView(self)
-        # self.graphicsView.setObjectName("graphicsView")
-        # self.horizontalLayout_2.addWidget(self.graphicsView)
 
         self.verticalLayout_2 = QtWidgets.QVBoxLayout()
         self.verticalLayout_2.setContentsMargins(2, 2, -1, -1)
@@ -74,6 +73,7 @@ class StatsPlot(QtWidgets.QWidget):
 
         self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
         # self.canvas.axes.plot([0,1,2,3,4], [10,1,20,3,40])
+        self.ax2 = self.canvas.axes.twinx()
 
         # self.figure, self.ax = plt.subplots(constrained_layout=True)
         # self.canvas = FigureCanvas(self.figure)
@@ -96,15 +96,23 @@ class StatsPlot(QtWidgets.QWidget):
 
         QtCore.QMetaObject.connectSlotsByName(self)
 
-        self.show()
+        # self.show()
+
+    def SaveWindow(self):
+        import datetime
+        day = datetime.datetime.now()
+        name = day.strftime('%y-%m-%d %H.%M.%S.png')
+        self.grab().save(name)
+        return
 
     def Update(self, day):
         # if self.SirModel.Sample < 3:
         #     return
 
-        if day < 15:
+        if day % 10 != 0:
             return
 
+        day = 200
         days = np.arange(0, day + 1)
 
         #  make sure the latest controls are on the screen
@@ -157,26 +165,32 @@ class StatsPlot(QtWidgets.QWidget):
         infected = self.SirModel.RunStats[
                    self.SirModel.infectedRS,
                    0: self.SirModel.Sample + 1,
-                   0:day + 1][-1]
-        # infected = np.cumsum(infected)
+                   0:day + 1]
 
-        unawareInfected = self.SirModel.RunStats[
-                          self.SirModel.unawareInfectedRS,
-                          0: self.SirModel.Sample + 1,
-                          0:day + 1][-1]
-        # unawareInfected = np.cumsum(unawareInfected)
+        infected = np.cumsum(infected, axis=1)
+        # infectedStd = np.std(infected, axis=0)
+        infected = np.mean(infected, axis=0)
 
         isoBySym = self.SirModel.RunStats[
                    self.SirModel.isoBySymptom,
                    0: self.SirModel.Sample + 1,
-                   0:day + 1][-1]
-        # isoBySym = np.cumsum(isoBySym)
+                   0:day + 1]
+        isoBySym = np.cumsum(isoBySym, axis=1)
+        isoBySym = np.mean(isoBySym, axis=0)
 
         isoByWatch = self.SirModel.RunStats[
                    self.SirModel.isoByWatch,
                    0: self.SirModel.Sample + 1,
-                   0:day + 1][-1]
-        # isoByWatch = np.cumsum(isoByWatch)
+                   0:day + 1]
+        isoByWatch = np.cumsum(isoByWatch, axis=1)
+        isoByWatch = np.mean(isoByWatch, axis=0)
+
+        unawareInfected = self.SirModel.RunStats[
+                   self.SirModel.unawareInfectedRS,
+                   0: self.SirModel.Sample + 1,
+                   0:day + 1]
+        unawareInfected = np.cumsum(unawareInfected, axis=1)
+        unawareInfected = np.mean(unawareInfected, axis=0)
 
         days = np.arange(0, day + 1)
         self.canvas.axes.cla()
@@ -184,10 +198,15 @@ class StatsPlot(QtWidgets.QWidget):
         self.canvas.axes.set_ylabel('Cumulative Counts')
         self.canvas.axes.grid(True)
 
-        self.canvas.axes.plot(days, infected[:], 'r')
-        self.canvas.axes.plot(days, unawareInfected[:], 'k')
-        self.canvas.axes.plot(days, isoBySym[:], 'y')
-        self.canvas.axes.plot(days, isoByWatch[:], 'm')
+        self.ax2.cla()
+
+        lns = self.canvas.axes.plot(days, infected[:], 'r', label='<- infected')
+        lns += self.canvas.axes.plot(days, isoBySym[:], 'y', label='<- iso by symp')
+        lns += self.canvas.axes.plot(days, isoByWatch[:], 'm', label='<- iso by watch')
+        lns += self.ax2.plot(days, unawareInfected[:], 'k', label='non-iso ->')
+
+        lbls = [line.get_label() for line in lns]
+        self.canvas.axes.legend(lns, lbls)
 
         self.canvas.draw()
 
