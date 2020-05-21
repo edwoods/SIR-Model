@@ -37,6 +37,10 @@ def make_format(current, other):
 
 class MainWindow(QtWidgets.QMainWindow):
 
+    def closeEvent(self, event):
+        app = QtGui.QApplication.instance()
+        app.closeAllWindows()
+
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
 
@@ -83,12 +87,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionStats1.triggered.connect(self.ShowStats1)
         self.actionStats1.setShortcut('Alt+1')
         self.menuView.addAction(self.actionStats1)
-
-        self.actionStats2 = QtWidgets.QAction(self)
-        self.actionStats2.setText("Stats 2")
-        self.actionStats2.triggered.connect(self.ShowStats2)
-        self.actionStats2.setShortcut('Alt+2')
-        self.menuView.addAction(self.actionStats2)
 
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.centralwidget)
         self.horizontalLayout.setContentsMargins(2, 2, 2, 2)
@@ -278,9 +276,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def ShowStats1(self):
         self.statsPlot.show()
-
-    def ShowStats2(self):
-        self.SP2.show()
+        self.statsPlot.raise_()
 
     def RunClicked(self):
         if self.running:
@@ -321,6 +317,17 @@ class MainWindow(QtWidgets.QMainWindow):
     def SaveStatsPlot(self):
         self.statsPlot.SaveWindow()
 
+        import datetime
+        from pathlib import Path
+
+        myPath = Path("./Plots")
+        myPath.mkdir(parents=True, exist_ok=True)
+
+        day = datetime.datetime.now()
+        name = day.strftime('./Plots/dayStats %y-%m-%d %H.%M.%S.png')
+        self.grab().save(name)
+        return
+
     def NewPlotClicked(self):
         self.newPlot = True
         self.PvDax.cla()
@@ -342,7 +349,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.DayToZero()
                 self.ControlsWindow.FirstDay()
 
-        self.SirModel.DailySummary(self.day)
         self.statsPlot.Update(self.day)
 
         self.DrawStuff()
@@ -455,7 +461,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tpAx.scatter(x[ir], y[ir], s=4, color='g', marker='.')
             self.tpAx.scatter(x[id], y[id], color='k', marker='*')
             self.tpAx.scatter(x[iso], y[iso], color='y', marker='o')
-            self.tpAx.scatter(x[hasWatch], y[hasWatch], s=12, facecolors='none', edgecolors='m')
+            self.tpAx.scatter(x[hasWatch], y[hasWatch], s=4, facecolors='none', edgecolors='m')
 
             if self.newPlot:
                 self.PvDax.cla()
@@ -463,6 +469,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.PvDax.set_title("Counts of people vs Day")
                 self.PvDax.set_xlabel('day')
                 self.PvDax.set_ylabel('Number of Infected')
+                self.ax2.set_ylabel('New infected / Non-isolated')
+                self.ax2.yaxis.label.set_color('grey')
 
             days = np.arange(0, self.day + 1)
 

@@ -30,13 +30,22 @@ class CountType(IntEnum):  # cols of the SirModel data array
      lastCountType] = range(6)
 
 
-class StatusType(IntEnum):
+class StatusType(IntEnum):  # status in SirModel.data[:,status]
     nonInfected = 0
     infected = 11
     recovered = 22
     dead = 99
     byWatch = 30
     bySymptom = 31
+
+
+class StatType(IntEnum):  # index into RunStats
+    [infected,
+     nonIsolated,
+     isoBySymptom,
+     isoByWatch,
+     removed,
+     lastRunStat] = range(6)
 
 
 class Cols(IntEnum):  # cols of the SirModel data array
@@ -108,12 +117,12 @@ class SirModel:
     EndOfTime = 999999
 
     # index into RunStats
-    [infectedRS,
-     unawareInfectedRS,
-     isoBySymptom,
-     isoByWatch,
-     removedRS,
-     lastRunStat] = range(6)
+    # [infectedRS,
+    #  unawareInfectedRS,
+    #  isoBySymptom,
+    #  isoByWatch,
+    #  removedRS,
+    #  lastRunStat] = range(6)
 
     maxSamples = 20
     maxSampleDay = 500
@@ -137,7 +146,7 @@ class SirModel:
 
         self.ctrlsChanged = False
         self.Sample = -1
-        self.RunStats = np.zeros([self.lastRunStat, self.maxSamples, self.maxSampleDay])  # 3 types of stats, 20 samples, 150 days
+        self.RunStats = np.zeros([StatType.lastRunStat, self.maxSamples, self.maxSampleDay])  # 3 types of stats, 20 samples, 150 days
         self.ResetStats = False
 
         self.data = np.zeros((self.cs[Ctrls.nPeeps], Cols.lastDataCol))
@@ -176,7 +185,7 @@ class SirModel:
 
         self.nRecoveredOrDead = np.count_nonzero(recovers) + np.count_nonzero(died) + np.count_nonzero(gonners)
 
-        self.RunStats[self.removedRS,
+        self.RunStats[StatType.removed,
                       self.Sample,
                       day] = self.nRecoveredOrDead
 
@@ -199,7 +208,7 @@ class SirModel:
         # nIsoByWatch = len(nIsoByWatch)
 
         nUnawareInfected = nInfected - len(isolated)
-        self.RunStats[self.unawareInfectedRS,
+        self.RunStats[StatType.nonIsolated,
                       self.Sample,
                       day] = nUnawareInfected
 
@@ -253,10 +262,6 @@ class SirModel:
             self.data[isolated, Cols.isolatedBy] = StatusType.bySymptom
             self.data[isolated, Cols.isolatedOn] = day + self.cs[Ctrls.Test2Isolate]
 
-            self.RunStats[self.isoBySymptom,
-                          self.Sample,
-                          day + self.cs[Ctrls.Test2Isolate]] = len(isolated)
-
         # get the guys that the watch alerted to get tested
         alertedByWatch = self.everyone[self.data[:, Cols.needTest] != 0]
         if len(alertedByWatch) != 0:
@@ -265,7 +270,7 @@ class SirModel:
         self.data[alertedByWatch, Cols.isolatedBy] = StatusType.byWatch
         self.data[alertedByWatch, Cols.isolatedOn] = day  # isolate the day after you are infected
 
-        self.RunStats[self.isoByWatch,
+        self.RunStats[StatType.isoByWatch,
                       self.Sample,
                       day] = len(alertedByWatch)
 
@@ -371,7 +376,7 @@ class SirModel:
             self.data[newSickStgr, Cols.dayInfec] = day
             self.data[newSickStgr, Cols.status] = StatusType.infected
 
-        self.RunStats[self.infectedRS,
+        self.RunStats[StatType.infected,
                       self.Sample,
                       day] = self.newInfected
 
@@ -382,10 +387,6 @@ class SirModel:
             self.ResetStats = False
             self.Sample = -1
             self.RunStats.fill(0)  # 3 types of stats, 20 samples, 150 days
-            # self.RunStats = np.zeros(
-            #     [self.lastRunStat,
-            #      self.maxSamples,
-            #      self.maxSampleDay])  # 3 types of stats, 20 samples, 150 days
 
         # if self.ctrlsChanged:
         #     self.ctrlsChanged = False
@@ -407,7 +408,7 @@ class SirModel:
         #  INITIAL infected guys
         infected = list(range(1000, self.cs[Ctrls.nPeeps], 1000))
 
-        self.RunStats[self.infectedRS,
+        self.RunStats[StatType.infected,
                       self.Sample,
                       0] = len(infected)
 

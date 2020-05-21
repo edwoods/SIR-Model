@@ -222,14 +222,15 @@ class ControlsWindow(QtWidgets.QMainWindow):
     def DuplicateColumn(self):
         colFrom = self.DefaultTable.currentColumn()
         row = self.DefaultTable.currentRow()
-        if row != 0:
+
+        if self.DefaultTable.item(0,colFrom).text() == '':
             return
 
         nCols = self.DefaultTable.columnCount()
         nRows = self.DefaultTable.rowCount()
 
         # find and empty column
-        cols = [icol for icol in range(colFrom + 1, nCols) if self.DefaultTable.item(0, icol) == None]
+        cols = [icol for icol in range(colFrom + 1, nCols) if self.DefaultTable.item(0, icol).text() == '']
         if len(cols) == 0:
             return
 
