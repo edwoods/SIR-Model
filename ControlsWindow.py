@@ -145,7 +145,7 @@ class ControlsWindow(QtWidgets.QMainWindow):
         self.FirstDay()
 
     def CopySceneControls(self):
-        for row in range(int(Ctrls.LastCtrl) ):
+        for row in range(int(Ctrls.LastCtrl)):
             text = self.Scenario[self.nthCtrls].Controls[row]
             self.controls[row].setText(text)
 
@@ -176,7 +176,9 @@ class ControlsWindow(QtWidgets.QMainWindow):
         if not item or item.text() == '':
             return
 
-        if item.text() == 'Scenario':
+        self.SirModel.SceneTitle = item.text()
+
+        if item.text().startswith('Scenario'):
             self.LoadScenario(colFrom)
             return
 

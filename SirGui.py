@@ -38,7 +38,7 @@ def make_format(current, other):
 class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event):
-        app = QtGui.QApplication.instance()
+        app = QtWidgets.QApplication.instance()
         app.closeAllWindows()
 
     def __init__(self, *args, **kwargs):
@@ -214,7 +214,7 @@ class MainWindow(QtWidgets.QMainWindow):
         #
         # self.CtrlsStatsLayout.addLayout(self.ButtonLayout)
 
-        self.horizontalLayout.addLayout(self.CtrlsStatsLayout)
+        # self.horizontalLayout.addLayout(self.CtrlsStatsLayout)
 
         # add the plots
         self.TopPlotFrame = QtWidgets.QFrame(self.splitter)
@@ -324,7 +324,9 @@ class MainWindow(QtWidgets.QMainWindow):
         myPath.mkdir(parents=True, exist_ok=True)
 
         day = datetime.datetime.now()
-        name = day.strftime('./Plots/dayStats %y-%m-%d %H.%M.%S.png')
+        name = day.strftime('%y-%m-%d %H.%M.%S.png')
+        title = self.windowTitle() + ' '
+        name = './Plots/' + title + name
         self.grab().save(name)
         return
 
@@ -404,10 +406,22 @@ class MainWindow(QtWidgets.QMainWindow):
             self.SirModel.cs[n] = newValue
             SirModel.ctrlsChanged = True
 
+    def Way1(self):
+        nsp = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.nonInfected,
+                             (self.SirModel.data[:, Cols.serviceGuy] == 0))
+        return nsp
+
+    def Way2(self):
+        nsp = self.SirModel.everyone[self.SirModel.data[:, Cols.status] == StatusType.nonInfected]
+        nsp = nsp[self.SirModel.data[nsp, Cols.serviceGuy] == 0]
+        return nsp
+
     def DrawStuff(self):
 
         # non-service susceptables
         nsp = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.nonInfected, (self.SirModel.data[:, Cols.serviceGuy] == 0))
+        # nsp = self.Way1()
+        # nsp = self.Way2()
 
         # service susceptables
         ssp = np.logical_and(self.SirModel.data[:, Cols.status] == StatusType.nonInfected, (self.SirModel.data[:, Cols.serviceGuy] == 1))
@@ -448,6 +462,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.counts[self.day, CountType.dead] = len(id)
         self.counts[self.day, CountType.infectRatio] = 100*(self.SirModel.newInfected / notIso)
 
+        self.setWindowTitle('SIR Model- ' + self.SirModel.SceneTitle)
+
         if self.day % 10 == 0:
             x = self.SirModel.data[:, Cols.xPos]
             y = self.SirModel.data[:, Cols.yPos]
@@ -460,8 +476,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tpAx.scatter(x[sip], y[sip], color='r', marker='+')
             self.tpAx.scatter(x[ir], y[ir], s=4, color='g', marker='.')
             self.tpAx.scatter(x[id], y[id], color='k', marker='*')
-            self.tpAx.scatter(x[iso], y[iso], color='y', marker='o')
-            self.tpAx.scatter(x[hasWatch], y[hasWatch], s=4, facecolors='none', edgecolors='m')
+            self.tpAx.scatter(x[iso], y[iso], s=4, color='y', marker='.')
+            self.tpAx.scatter(x[hasWatch], y[hasWatch], s=4, color='m', marker='.')
+            # self.tpAx.scatter(x[hasWatch], y[hasWatch], color='m', marker='.', facecolors='none', edgecolors='m')
 
             if self.newPlot:
                 self.PvDax.cla()

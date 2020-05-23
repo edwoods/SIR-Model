@@ -17,7 +17,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 class StatsPlot(QtWidgets.QWidget):
     def closeEvent(self, event):
-        app = QtGui.QApplication.instance()
+        app = QtWidgets.QApplication.instance()
         app.closeAllWindows()
 
     def __init__(self, controls, SirModel, *args, **kwargs):
@@ -106,11 +106,16 @@ class StatsPlot(QtWidgets.QWidget):
         myPath.mkdir(parents=True, exist_ok=True)
 
         day = datetime.datetime.now()
-        name = day.strftime('./Plots/CumStats %y-%m-%d %H.%M.%S.png')
+        name = day.strftime('%y-%m-%d %H.%M.%S.png')
+
+        title = self.windowTitle() + ' '
+        name = './Plots/' + title + name
         self.grab().save(name)
         return
 
     def Update(self, day):
+        self.setWindowTitle('Multi-run stats- ' + self.SirModel.SceneTitle)
+
         isolated = self.SirModel.everyone[self.SirModel.data[:, Cols.isolatedOn] == day]
         isoBySymptom = isolated[self.SirModel.data[isolated, Cols.isolatedBy] == StatusType.bySymptom]
         isoByWatch = isolated[self.SirModel.data[isolated, Cols.isolatedBy] == StatusType.byWatch]
@@ -176,7 +181,7 @@ class StatsPlot(QtWidgets.QWidget):
         self.canvas.axes.grid(True)
 
         self.ax2.cla()
-        self.ax2.set_ylabel('Total Non-isolated')
+        self.ax2.set_ylabel('Cum Non-isolated')
         self.ax2.yaxis.label.set_color('b')
         self.ax2.tick_params(axis='y', colors='b')
 
